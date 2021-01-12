@@ -160,6 +160,7 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 	if err := c.syncApiServiceToAllCluster(apiService); err != nil {
 		utilruntime.HandleError(err)
 		klog.Error(err, "Error when syncing app service across cluster.")
+		return err
 	}
 	return nil
 }

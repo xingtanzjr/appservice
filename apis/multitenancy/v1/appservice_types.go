@@ -32,33 +32,33 @@ type AppServiceSpec struct {
 	DeploymentSpec appsv1.DeploymentSpec `json:"deploymentSpec"`
 	ServiceSpec    corev1.ServiceSpec    `json:"serviceSpec"`
 	// +optional
-	PodAutoScalerSpec autoscalingv1.HorizontalPodAutoscalerSpec `json:"podAutoScalerSpec"`
+	PodAutoScalerSpec autoscalingv1.HorizontalPodAutoscalerSpec `json:"podAutoScalerSpec,omitempty"`
 
 	// Spec for rules. These two
 	// +optional
-	RoleKind string `json:"roleKind"`
+	RoleKind string `json:"roleKind,omitempty"`
 	// +optional
-	RoleMetadata metav1.ObjectMeta `json:"roleMetadata"`
+	RoleMetadata metav1.ObjectMeta `json:"roleMetadata,omitempty"`
 	// +optional
-	RoleRules []rbacv1.PolicyRule `json:"roleRules"`
+	RoleRules []rbacv1.PolicyRule `json:"roleRules,omitempty"`
 
 	// Spec for role-bindings
 	// +optional
-	RoleBindingKind string `json:"roleBindingKind"`
+	RoleBindingKind string `json:"roleBindingKind,omitempty"`
 	// +optional
-	RoleBindingMetadata metav1.ObjectMeta `json:"roleBindingMetadata"`
+	RoleBindingMetadata metav1.ObjectMeta `json:"roleBindingMetadata,omitempty"`
 	// +optional
-	RoleBindingSubjects []rbacv1.Subject `json:"roleBindingSubjects"`
+	RoleBindingSubjects []rbacv1.Subject `json:"roleBindingSubjects,omitempty"`
 	// +optional
-	RoleBindingRoleRef rbacv1.RoleRef `json:"roleBindingRoleRef"`
+	RoleBindingRoleRef rbacv1.RoleRef `json:"roleBindingRoleRef,omitempty"`
 
 	// Spec for service account
 	// +optional
-	ServiceAccountMeta metav1.ObjectMeta `json:"serviceAccountMeta"`
+	ServiceAccountMeta metav1.ObjectMeta `json:"serviceAccountMeta,omitempty"`
 
 	// Spec for istio virtual service
 	// +optional
-	VirtualServiceSpec VirtualServiceSpec `json:"virtualServiceSpec"`
+	VirtualServiceSpec VirtualServiceSpec `json:"virtualServiceSpec,omitempty"`
 }
 
 type AppServiceStatus struct {

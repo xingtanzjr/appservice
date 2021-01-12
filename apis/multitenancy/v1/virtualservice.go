@@ -1,9 +1,9 @@
 package v1
 
 type VirtualServiceSpec struct {
-	Hosts    []string                 `json:"hosts"`
-	Gateways []string                 `json:"gateways"`
-	Http     []VirtualServiceHttpSpec `json:"http"`
+	Hosts    []string                 `json:"hosts,omitempty"`
+	Gateways []string                 `json:"gateways,omitempty"`
+	Http     []VirtualServiceHttpSpec `json:"http,omitempty"`
 }
 
 type VirtualServiceHttpSpec struct {

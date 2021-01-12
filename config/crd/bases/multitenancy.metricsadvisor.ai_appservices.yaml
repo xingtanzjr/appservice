@@ -7046,10 +7046,6 @@ spec:
                     - route
                     type: object
                   type: array
-              required:
-              - gateways
-              - hosts
-              - http
               type: object
           required:
           - deploymentSpec
