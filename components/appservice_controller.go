@@ -2,19 +2,23 @@ package components
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-
 	apis "metricsadvisor.ai/appservice/apis/multitenancy/v1"
 )
 
-var API_SERVICE_WORK_QUEUE_NAME = "ApiServiceWorkQueue"
+var APP_SERVICE_WORK_QUEUE_NAME = "ApiServiceWorkQueue"
+var APP_SERVICE_DEPLOYMENT_SUFFIX = "-deployment"
+var APP_SERVICE_KIND = "AppService"
 
 type EventItem struct {
 	ClusterId string
@@ -28,13 +32,15 @@ func (item *EventItem) String() string {
 type ApiServiceController struct {
 	clusterToolMap map[string]*ClusterTool
 	workqueue      workqueue.RateLimitingInterface
+	replicaTool    ReplicaTool
 	//TODO learn more about Recorder and leverage it in current program
 }
 
 func NewApiServiceController(clusterToolMap map[string]*ClusterTool) *ApiServiceController {
 	controller := &ApiServiceController{
 		clusterToolMap: clusterToolMap,
-		workqueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), API_SERVICE_WORK_QUEUE_NAME),
+		workqueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), APP_SERVICE_WORK_QUEUE_NAME),
+		replicaTool:    NewReplicaTool(&clusterToolMap),
 	}
 
 	// Add event handler
@@ -162,6 +168,45 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 		klog.Error(err, "Error when syncing app service across cluster.")
 		return err
 	}
+
+	// Create sub resources in each cluster
+
+	// Create deployment
+	if err := c.maintainDeployment(apiService); err != nil {
+		utilruntime.HandleError(err)
+		klog.Error(err, fmt.Sprintf("Error when maintain deployments for app service[%s]", apiService.Name))
+	}
+
+	return nil
+}
+
+func (c *ApiServiceController) maintainDeployment(target *apis.AppService) error {
+	for clusterId, tool := range c.clusterToolMap {
+		deploymentName := c.getDeploymentName(target)
+		current, err := tool.GetDeployment(target.Namespace, deploymentName)
+		replicas := c.replicaTool.GetReplicas(clusterId, target.Spec.TotalReplicas, target.Spec.ReplicaPolicy)
+		targetDeployment := c.newDeployment(target, &replicas)
+		// Once err occurs during maintaining deployment, the err will be returned and the maintainance will be interrupted
+		if err != nil {
+			// If the deployment does not exist
+			if errors.IsNotFound(err) {
+				err := tool.CreateDeployment(targetDeployment)
+				if err != nil {
+					return err
+				}
+				klog.Infof("Create deployment in cluster[%s] for AppService[%s]", clusterId, target.Name)
+			} else {
+				return err
+			}
+			// If current and target is different, update current.
+		} else if !reflect.DeepEqual(targetDeployment.Spec, current.Spec) {
+			err := tool.UpdateDeployment(targetDeployment, current)
+			if err != nil {
+				return err
+			}
+			klog.Infof("Update deployment in cluster[%s] for AppService[%s]", clusterId, target.Name)
+		}
+	}
 	return nil
 }
 
@@ -207,4 +252,23 @@ func (c *ApiServiceController) shouldUpdate(current, target *apis.AppService) bo
 		return true
 	}
 	return false
+}
+
+func (c *ApiServiceController) getDeploymentName(appService *apis.AppService) string {
+	return appService.Name + APP_SERVICE_DEPLOYMENT_SUFFIX
+}
+
+func (c *ApiServiceController) newDeployment(appService *apis.AppService, replicas *int32) *appsv1.Deployment {
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.getDeploymentName(appService),
+			Namespace: appService.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(appService, apis.SchemeGroupVersion.WithKind(APP_SERVICE_KIND)),
+			},
+		},
+		Spec: appService.Spec.DeploymentSpec,
+	}
+	deployment.Spec.Replicas = replicas
+	return deployment
 }
