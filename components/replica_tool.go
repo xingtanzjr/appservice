@@ -1,15 +1,25 @@
 package components
 
+import (
+	"sort"
+)
+
 type ReplicaTool struct {
 	clusterIndexMap map[string]int32
 }
 
 func NewReplicaTool(clusterToolMap *map[string]*ClusterTool) ReplicaTool {
+	var clusterIds []string
 	clusterIndexMap := make(map[string]int32)
-	i := 0
-	for clusterId, _ := range *clusterToolMap {
-		clusterIndexMap[clusterId] = int32(i)
-		i++
+
+	for clusterId := range *clusterToolMap {
+		clusterIds = append(clusterIds, clusterId)
+	}
+	// Becasue the map does not have sort ensurance,
+	// sort the clusterIds to ensure that each clusterId will corresponding the fixed `Index` in clusterIndexMap
+	sort.Strings(clusterIds)
+	for idx, clusterId := range clusterIds {
+		clusterIndexMap[clusterId] = int32(idx)
 	}
 	return ReplicaTool{
 		clusterIndexMap: clusterIndexMap,
@@ -17,7 +27,7 @@ func NewReplicaTool(clusterToolMap *map[string]*ClusterTool) ReplicaTool {
 }
 
 func (r *ReplicaTool) GetReplicas(clusterId string, totalReplicas *int32, replicaPolicy string) int32 {
-	// Currently we only implement the basic replicaPolicy `avg`
+	// TODO: Currently we only implement the basic replicaPolicy `avg`
 	clusterCount := len(r.clusterIndexMap)
 	index := r.clusterIndexMap[clusterId]
 	var plus int32

@@ -16,7 +16,7 @@ import (
 	asInformerFactory "metricsadvisor.ai/appservice/generated/multitenancy/informers/externalversions"
 )
 
-var DEFAULT_RESYNC_INTERVAL = time.Second * 30
+var DEFAULT_RESYNC_INTERVAL = time.Second * 10
 
 var clusterMap = map[string]string{
 	"aks-0": "/Users/zhangjinrui/.kube/config-aks-0",
