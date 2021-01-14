@@ -7,6 +7,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -21,6 +22,9 @@ var APP_SERVICE_WORK_QUEUE_NAME = "ApiServiceWorkQueue"
 var APP_SERVICE_DEPLOYMENT_SUFFIX = "-deployment"
 var APP_SERVICE_SERVICE_SUFFIX = "-svc"
 var APP_SERVICE_KIND = "AppService"
+
+var RESOURCE_KIND_ROLE = "Role"
+var RESOURCE_KIND_CLUSTER_ROLE = "ClusterRole"
 
 type EventItem struct {
 	ClusterId string
@@ -171,7 +175,7 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 		return err
 	}
 
-	// Create sub resources in each cluster
+	// Then, main sub resources in each cluster
 
 	// Maintain deployment
 	if err := c.maintainDeployment(apiService); err != nil {
@@ -184,6 +188,12 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 	if err := c.maintainService(apiService); err != nil {
 		utilruntime.HandleError(err)
 		klog.Error(err, fmt.Sprintf("Error when maintain service for AppService[%s]", apiService.Name))
+		return err
+	}
+
+	if err := c.maintainRole(apiService); err != nil {
+		utilruntime.HandleError(err)
+		klog.Error(err, fmt.Sprintf("Error when maintain role for AppService[%s]", apiService.Name))
 		return err
 	}
 
@@ -244,6 +254,58 @@ func (c *ApiServiceController) maintainService(target *apis.AppService) error {
 		}
 	}
 	return nil
+}
+
+func (c *ApiServiceController) maintainRole(target *apis.AppService) error {
+	// this means there is no Role Definition, return directly
+	if len(target.Spec.RoleTemplate.Kind) == 0 {
+		return nil
+	}
+	for clusterId, tool := range c.clusterToolMap {
+		if target.Spec.RoleTemplate.Kind == RESOURCE_KIND_ROLE {
+			targetRole := c.newRole(target)
+			current, err := tool.GetRole(targetRole.Namespace, targetRole.Name)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					err := tool.CreateRole(targetRole)
+					if err != nil {
+						return nil
+					}
+					klog.Infof("Create Role[%s] in cluster[%s] for AppService[%s]", targetRole.Namespace, clusterId, target.Name)
+				} else {
+					return err
+				}
+			} else if c.isRoleDifferent(targetRole, current) {
+				err := tool.UpdateRole(targetRole)
+				if err != nil {
+					return err
+				}
+				klog.Infof("Update Role[%s] in cluster[%s] for AppService[%s]", targetRole.Name, clusterId, target.Name)
+			}
+		} else if target.Spec.RoleTemplate.Kind == RESOURCE_KIND_CLUSTER_ROLE {
+
+		}
+	}
+
+	return nil
+}
+
+func (c *ApiServiceController) verifyRoleSpec(target *apis.AppService) error {
+	kind := target.Spec.RoleTemplate.Kind
+	if kind != RESOURCE_KIND_ROLE || kind != RESOURCE_KIND_CLUSTER_ROLE {
+		return fmt.Errorf("Spec for RoleKind is not correct. Value: %s", kind)
+	}
+	return nil
+}
+
+func (c *ApiServiceController) newRole(target *apis.AppService) *rbacv1.Role {
+	return &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      target.Spec.RoleTemplate.Metadata.Name,
+			Namespace: target.Namespace,
+		},
+		Rules: target.Spec.RoleTemplate.Rules,
+	}
 }
 
 func (c *ApiServiceController) syncApiServiceToAllCluster(target *apis.AppService) error {
@@ -337,6 +399,11 @@ func (c *ApiServiceController) getUpdatedService(target, current *corev1.Service
 	return current
 }
 
+func (c *ApiServiceController) getUpdatedRole(target, current *rbacv1.Role) *rbacv1.Role {
+	current.Rules = target.Rules
+	return current
+}
+
 // TODO: verify whether this comparision is enough or overhead
 func (c *ApiServiceController) isDeploymentDifferent(target, current *appsv1.Deployment) bool {
 	if *target.Spec.Replicas != *current.Spec.Replicas {
@@ -368,6 +435,13 @@ func (c *ApiServiceController) isSvcDifferent(target, current *corev1.Service) b
 		return true
 	}
 	if len(target.Spec.Selector) > 0 && !reflect.DeepEqual(target.Spec.Selector, current.Spec.Selector) {
+		return true
+	}
+	return false
+}
+
+func (c *ApiServiceController) isRoleDifferent(target, current *rbacv1.Role) bool {
+	if !reflect.DeepEqual(target.Rules, current.Rules) {
 		return true
 	}
 	return false

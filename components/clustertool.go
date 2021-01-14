@@ -15,6 +15,7 @@ import (
 	istioClient "istio.io/client-go/pkg/clientset/versioned"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apis "metricsadvisor.ai/appservice/apis/multitenancy/v1"
 )
@@ -99,6 +100,20 @@ func (c *ClusterTool) CreateService(svc *corev1.Service) error {
 
 func (c *ClusterTool) UpdateService(target *corev1.Service) error {
 	_, err := c.KubeClient.CoreV1().Services(target.Namespace).Update(context.TODO(), target, metav1.UpdateOptions{})
+	return err
+}
+
+func (c *ClusterTool) GetRole(namespace, name string) (*rbacv1.Role, error) {
+	return c.KubeClient.RbacV1().Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
+func (c *ClusterTool) CreateRole(target *rbacv1.Role) error {
+	_, err := c.KubeClient.RbacV1().Roles(target.Namespace).Create(context.TODO(), target, metav1.CreateOptions{})
+	return err
+}
+
+func (c *ClusterTool) UpdateRole(target *rbacv1.Role) error {
+	_, err := c.KubeClient.RbacV1().Roles(target.Namespace).Update(context.TODO(), target, metav1.UpdateOptions{})
 	return err
 }
 

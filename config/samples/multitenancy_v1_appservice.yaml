@@ -26,4 +26,11 @@ spec:
       - protocol: TCP
         port: 80
         targetPort: 9376
-  
+  roleTemplate:
+    kind: Role
+    metadata:
+      name: kensho2-watchdog-role
+    rules:
+    - apiGroups: ["apps"]
+      resources: ["deployments"]
+      verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

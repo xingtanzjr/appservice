@@ -20,7 +20,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -34,23 +33,13 @@ type AppServiceSpec struct {
 	// +optional
 	PodAutoScalerSpec autoscalingv1.HorizontalPodAutoscalerSpec `json:"podAutoScalerSpec,omitempty"`
 
-	// Spec for rules. These two
+	// Spec for role
 	// +optional
-	RoleKind string `json:"roleKind,omitempty"`
-	// +optional
-	RoleMetadata metav1.ObjectMeta `json:"roleMetadata,omitempty"`
-	// +optional
-	RoleRules []rbacv1.PolicyRule `json:"roleRules,omitempty"`
+	RoleTemplate RoleTemplate `json:"roleTemplate,omitempty"`
 
 	// Spec for role-bindings
 	// +optional
-	RoleBindingKind string `json:"roleBindingKind,omitempty"`
-	// +optional
-	RoleBindingMetadata metav1.ObjectMeta `json:"roleBindingMetadata,omitempty"`
-	// +optional
-	RoleBindingSubjects []rbacv1.Subject `json:"roleBindingSubjects,omitempty"`
-	// +optional
-	RoleBindingRoleRef rbacv1.RoleRef `json:"roleBindingRoleRef,omitempty"`
+	RoleBindingTemplate RoleBindingTemplate `json:"roleBindingTemplate,omitempty"`
 
 	// Spec for service account
 	// +optional
