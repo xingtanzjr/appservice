@@ -16,9 +16,9 @@ type VirtualServiceHttpSpec struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 	// +optional
-	Match []VirtualServiceUri `json:"match,omitempty"`
+	Match []VirtualServiceMatch `json:"match,omitempty"`
 	// +optional
-	Rewrite VirtualServiceMatch `json:"rewrite,omitempty"`
+	Rewrite VirtualServiceRewrite `json:"rewrite,omitempty"`
 	// +optional
 	Route []VirtualServiceRoute `json:"route,omitempty"`
 }
@@ -27,12 +27,16 @@ type VirtualServiceMatch struct {
 	Uri VirtualServiceUri `json:"uri,omitempty"`
 }
 
+type VirtualServiceRewrite struct {
+	Uri string `json:"uri,omitempty"`
+}
+
 type VirtualServiceUri struct {
 	Prefix string `json:"prefix,omitempty"`
 }
 
 type VirtualServiceRoute struct {
-	Route VirtualServiceDestination `json:"route,omitempty"`
+	Destination VirtualServiceDestination `json:"destination,omitempty"`
 }
 
 type VirtualServiceDestination struct {

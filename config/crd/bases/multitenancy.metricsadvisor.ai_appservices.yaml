@@ -7019,24 +7019,30 @@ spec:
                       match:
                         items:
                           properties:
-                            prefix:
-                              type: string
+                            uri:
+                              properties:
+                                prefix:
+                                  type: string
+                              type: object
                           type: object
                         type: array
                       name:
                         type: string
                       rewrite:
                         properties:
-                          prefix:
+                          uri:
                             type: string
                         type: object
                       route:
                         items:
                           properties:
-                            host:
-                              type: string
-                            subset:
-                              type: string
+                            destination:
+                              properties:
+                                host:
+                                  type: string
+                                subset:
+                                  type: string
+                              type: object
                           type: object
                         type: array
                     type: object

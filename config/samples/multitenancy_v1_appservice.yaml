@@ -46,3 +46,16 @@ spec:
       kind: ClusterRole
       name: kensho2-watchdog-clusterRole
       apiGroup: rbac.authorization.k8s.io
+  virtualServiceSpec:
+    hosts:
+    - jinrzhantest
+    http:
+    - name: appservice-sample
+      match:
+      - uri:
+        prefix: /appservice-sample/
+      rewrite:
+        uri: /
+      route:
+      - destination:
+          host: appservice-sample-svc.default.svc.cluster.local

@@ -230,6 +230,15 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 		}
 	}
 
+	// Maintain VirtualService
+	if c.needToMaintainVirtualService(appService) {
+		virtualServiceReconciler := reconciler.NewVirtualServiceReconciler(appService, c.clusterToolMap)
+		if err := reconciler.Reconcile(virtualServiceReconciler); err != nil {
+			utilruntime.HandleError(err)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -256,6 +265,13 @@ func (c *ApiServiceController) needToMaintainRoleBinding(target *apis.AppService
 
 func (c *ApiServiceController) needToMaintainClusterRoleBinding(target *apis.AppService) bool {
 	if target.Spec.RoleBindingTemplate.Kind == RESOURCE_KIND_CLUSTER_ROLE_BINDING {
+		return true
+	}
+	return false
+}
+
+func (c *ApiServiceController) needToMaintainVirtualService(target *apis.AppService) bool {
+	if len(target.Spec.VirtualServiceSpec.Hosts) > 0 {
 		return true
 	}
 	return false
