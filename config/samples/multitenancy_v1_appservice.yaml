@@ -27,10 +27,22 @@ spec:
         port: 80
         targetPort: 9376
   roleTemplate:
-    kind: ClusterRole
+    kind: Role
     metadata:
       name: kensho2-watchdog-clusterRole
     rules:
     - apiGroups: ["apps"]
       resources: ["deployments"]
       verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  roleBindingTemplate:
+    kind: RoleBinding
+    metadata:
+      name: kensho2-watchdog-binding
+    subjects:
+    - kind: User
+      name: Jinrui
+      apiGroup: rbac.authorization.k8s.io
+    roleRef:
+      kind: ClusterRole
+      name: kensho2-watchdog-clusterRole
+      apiGroup: rbac.authorization.k8s.io
