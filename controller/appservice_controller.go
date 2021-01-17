@@ -1,4 +1,4 @@
-package components
+package controller
 
 import (
 	"fmt"
@@ -16,6 +16,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	apis "metricsadvisor.ai/appservice/apis/multitenancy/v1"
+	components "metricsadvisor.ai/appservice/components"
+	reconciler "metricsadvisor.ai/appservice/reconciler"
 )
 
 var APP_SERVICE_WORK_QUEUE_NAME = "ApiServiceWorkQueue"
@@ -36,17 +38,17 @@ func (item *EventItem) String() string {
 }
 
 type ApiServiceController struct {
-	clusterToolMap map[string]*ClusterTool
+	clusterToolMap map[string]*components.ClusterTool
 	workqueue      workqueue.RateLimitingInterface
-	replicaTool    ReplicaTool
+	replicaTool    reconciler.ReplicaTool
 	//TODO learn more about Recorder and leverage it in current program
 }
 
-func NewApiServiceController(clusterToolMap map[string]*ClusterTool) *ApiServiceController {
+func NewApiServiceController(clusterToolMap map[string]*components.ClusterTool) *ApiServiceController {
 	controller := &ApiServiceController{
 		clusterToolMap: clusterToolMap,
 		workqueue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), APP_SERVICE_WORK_QUEUE_NAME),
-		replicaTool:    NewReplicaTool(&clusterToolMap),
+		replicaTool:    reconciler.NewReplicaTool(&clusterToolMap),
 	}
 
 	// Add event handler
@@ -177,10 +179,16 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 
 	// Then, main sub resources in each cluster
 
-	// Maintain deployment
-	if err := c.maintainDeployment(apiService); err != nil {
+	// // Maintain deployment
+	// if err := c.maintainDeployment(apiService); err != nil {
+	// 	utilruntime.HandleError(err)
+	// 	klog.Error(err, fmt.Sprintf("Error when maintain deployments for AppService[%s]", apiService.Name))
+	// 	return err
+	// }
+
+	deploymentReconciler := reconciler.NewDeploymentReconciler(*apiService, c.clusterToolMap)
+	if err := reconciler.Reconcile(deploymentReconciler); err != nil {
 		utilruntime.HandleError(err)
-		klog.Error(err, fmt.Sprintf("Error when maintain deployments for AppService[%s]", apiService.Name))
 		return err
 	}
 
@@ -341,8 +349,8 @@ func (c *ApiServiceController) shouldUpdate(current, target *apis.AppService) bo
 	if current.ObjectMeta.ManagedFields == nil {
 		return true
 	}
-	updateTimeInCluster := GetResourceUpdateTime(current.ObjectMeta)
-	updateTimeOfTarget := GetResourceUpdateTime(target.ObjectMeta)
+	updateTimeInCluster := components.GetResourceUpdateTime(current.ObjectMeta)
+	updateTimeOfTarget := components.GetResourceUpdateTime(target.ObjectMeta)
 	if updateTimeInCluster == nil && updateTimeOfTarget != nil {
 		return true
 	}

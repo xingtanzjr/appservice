@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"metricsadvisor.ai/appservice/components"
+	"metricsadvisor.ai/appservice/controller"
 	asClient "metricsadvisor.ai/appservice/generated/multitenancy/clientset/versioned"
 	asInformerFactory "metricsadvisor.ai/appservice/generated/multitenancy/informers/externalversions"
 )
@@ -137,7 +138,7 @@ func main() {
 		return
 	}
 
-	apiServiceController := components.NewApiServiceController(clusterToolMap)
+	apiServiceController := controller.NewApiServiceController(clusterToolMap)
 	apiServiceController.Run(1, stopCh)
 	// close(stopCh)
 }

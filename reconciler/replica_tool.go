@@ -1,14 +1,16 @@
-package components
+package reconciler
 
 import (
 	"sort"
+
+	components "metricsadvisor.ai/appservice/components"
 )
 
 type ReplicaTool struct {
 	clusterIndexMap map[string]int32
 }
 
-func NewReplicaTool(clusterToolMap *map[string]*ClusterTool) ReplicaTool {
+func NewReplicaTool(clusterToolMap *map[string]*components.ClusterTool) ReplicaTool {
 	var clusterIds []string
 	clusterIndexMap := make(map[string]int32)
 
