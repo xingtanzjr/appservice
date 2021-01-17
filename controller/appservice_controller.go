@@ -26,6 +26,7 @@ var APP_SERVICE_KIND = "AppService"
 var RESOURCE_KIND_ROLE = "Role"
 var RESOURCE_KIND_CLUSTER_ROLE = "ClusterRole"
 var RESOURCE_KIND_ROLE_BINDING = "RoleBinding"
+var RESOURCE_KIND_CLUSTER_ROLE_BINDING = "ClusterRoleBinding"
 
 type EventItem struct {
 	ClusterId string
@@ -219,6 +220,16 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 			return err
 		}
 	}
+
+	// Maintain ClusterRoleBinding
+	if c.needToMaintainClusterRoleBinding(appService) {
+		clusterRoleBindingReconciler := reconciler.NewClusterRoleBindingReconciler(appService, c.clusterToolMap)
+		if err := reconciler.Reconcile(clusterRoleBindingReconciler); err != nil {
+			utilruntime.HandleError(err)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -238,6 +249,13 @@ func (c *ApiServiceController) needToMaintainClusterRole(target *apis.AppService
 
 func (c *ApiServiceController) needToMaintainRoleBinding(target *apis.AppService) bool {
 	if target.Spec.RoleBindingTemplate.Kind == RESOURCE_KIND_ROLE_BINDING {
+		return true
+	}
+	return false
+}
+
+func (c *ApiServiceController) needToMaintainClusterRoleBinding(target *apis.AppService) bool {
+	if target.Spec.RoleBindingTemplate.Kind == RESOURCE_KIND_CLUSTER_ROLE_BINDING {
 		return true
 	}
 	return false
