@@ -27,9 +27,9 @@ spec:
         port: 80
         targetPort: 9376
   roleTemplate:
-    kind: Role
+    kind: ClusterRole
     metadata:
-      name: kensho2-watchdog-role
+      name: kensho2-watchdog-clusterRole
     rules:
     - apiGroups: ["apps"]
       resources: ["deployments"]

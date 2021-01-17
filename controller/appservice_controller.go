@@ -6,7 +6,6 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -161,7 +160,7 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 	}
 
 	// Pick the apiService resource in Lister from corresponding Cluster
-	apiService, err := c.clusterToolMap[item.ClusterId].GetApiService(namespace, name)
+	appService, err := c.clusterToolMap[item.ClusterId].GetApiService(namespace, name)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			utilruntime.HandleError(fmt.Errorf("ApiService '%s' in work queue no longer exits", item))
@@ -170,7 +169,7 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 	}
 
 	// First, Sync the target app service across all cluster
-	if err := c.syncApiServiceToAllCluster(apiService); err != nil {
+	if err := c.syncApiServiceToAllCluster(appService); err != nil {
 		utilruntime.HandleError(err)
 		klog.Error(err, "Error when syncing app service across cluster.")
 		return err
@@ -179,23 +178,33 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 	// Then, main sub resources in each cluster
 
 	// Maintain deployment
-	deploymentReconciler := reconciler.NewDeploymentReconciler(apiService, c.clusterToolMap)
+	deploymentReconciler := reconciler.NewDeploymentReconciler(appService, c.clusterToolMap)
 	if err := reconciler.Reconcile(deploymentReconciler); err != nil {
 		utilruntime.HandleError(err)
 		return err
 	}
 
 	// Maintain Service
-	serviceReconciler := reconciler.NewServiceReconciler(apiService, c.clusterToolMap)
+	serviceReconciler := reconciler.NewServiceReconciler(appService, c.clusterToolMap)
 	if err := reconciler.Reconcile(serviceReconciler); err != nil {
 		utilruntime.HandleError(err)
 		return err
 	}
 
 	// Maintain Role
-	if c.needToMaintainRole(apiService) {
-		roleReconciler := reconciler.NewRoleReconciler(apiService, c.clusterToolMap)
+	// TOOD: think about how to delete expired resouce if the kind of Role/ClusterRole is changed
+	if c.needToMaintainRole(appService) {
+		roleReconciler := reconciler.NewRoleReconciler(appService, c.clusterToolMap)
 		if err := reconciler.Reconcile(roleReconciler); err != nil {
+			utilruntime.HandleError(err)
+			return err
+		}
+	}
+
+	// Maintain ClusterRole
+	if c.needToMaintainClusterRole(appService) {
+		clusterRoleReconciler := reconciler.NewClusterRoleReconciler(appService, c.clusterToolMap)
+		if err := reconciler.Reconcile(clusterRoleReconciler); err != nil {
 			utilruntime.HandleError(err)
 			return err
 		}
@@ -232,16 +241,6 @@ func (c *ApiServiceController) verifyRoleSpec(target *apis.AppService) error {
 		return fmt.Errorf("Spec for RoleKind is not correct. Value: %s", kind)
 	}
 	return nil
-}
-
-func (c *ApiServiceController) newRole(target *apis.AppService) *rbacv1.Role {
-	return &rbacv1.Role{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      target.Spec.RoleTemplate.Metadata.Name,
-			Namespace: target.Namespace,
-		},
-		Rules: target.Spec.RoleTemplate.Rules,
-	}
 }
 
 func (c *ApiServiceController) syncApiServiceToAllCluster(target *apis.AppService) error {
