@@ -46,6 +46,9 @@ func (r *ClusterRoleReconciler) newClusterRoleForCreate() *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: r.AppService.Spec.RoleTemplate.Metadata.Name,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(r.AppService, apis.SchemeGroupVersion.WithKind(APP_SERVICE_KIND)),
+			},
 		},
 		Rules: r.AppService.Spec.RoleTemplate.Rules,
 	}

@@ -47,6 +47,9 @@ func (r *RoleReconciler) NewRoleForCreate() *rbacv1.Role {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      r.AppService.Spec.RoleTemplate.Metadata.Name,
 			Namespace: r.AppService.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(r.AppService, apis.SchemeGroupVersion.WithKind(APP_SERVICE_KIND)),
+			},
 		},
 		Rules: r.AppService.Spec.RoleTemplate.Rules,
 	}
