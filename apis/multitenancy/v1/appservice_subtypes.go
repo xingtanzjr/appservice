@@ -6,20 +6,33 @@ import (
 )
 
 type VirtualServiceSpec struct {
-	Hosts    []string                 `json:"hosts,omitempty"`
+	Hosts []string `json:"hosts,omitempty"`
+	// +optional
 	Gateways []string                 `json:"gateways,omitempty"`
 	Http     []VirtualServiceHttpSpec `json:"http,omitempty"`
 }
 
 type VirtualServiceHttpSpec struct {
-	Name    string                      `json:"name,omitempty"`
-	Match   []VirtualServiceUri         `json:"match,omitempty"`
-	Rewrite VirtualServiceUri           `json:"rewrite,omitempty"`
-	Route   []VirtualServiceDestination `json:"route,omitempty"`
+	// +optional
+	Name string `json:"name,omitempty"`
+	// +optional
+	Match []VirtualServiceUri `json:"match,omitempty"`
+	// +optional
+	Rewrite VirtualServiceMatch `json:"rewrite,omitempty"`
+	// +optional
+	Route []VirtualServiceRoute `json:"route,omitempty"`
+}
+
+type VirtualServiceMatch struct {
+	Uri VirtualServiceUri `json:"uri,omitempty"`
 }
 
 type VirtualServiceUri struct {
 	Prefix string `json:"prefix,omitempty"`
+}
+
+type VirtualServiceRoute struct {
+	Route VirtualServiceDestination `json:"route,omitempty"`
 }
 
 type VirtualServiceDestination struct {
