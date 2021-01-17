@@ -6,7 +6,6 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -179,23 +178,17 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 
 	// Then, main sub resources in each cluster
 
-	// // Maintain deployment
-	// if err := c.maintainDeployment(apiService); err != nil {
-	// 	utilruntime.HandleError(err)
-	// 	klog.Error(err, fmt.Sprintf("Error when maintain deployments for AppService[%s]", apiService.Name))
-	// 	return err
-	// }
-
-	deploymentReconciler := reconciler.NewDeploymentReconciler(*apiService, c.clusterToolMap)
+	// Maintain deployment
+	deploymentReconciler := reconciler.NewDeploymentReconciler(apiService, c.clusterToolMap)
 	if err := reconciler.Reconcile(deploymentReconciler); err != nil {
 		utilruntime.HandleError(err)
 		return err
 	}
 
 	// Maintain Service
-	if err := c.maintainService(apiService); err != nil {
+	serviceReconciler := reconciler.NewServiceReconciler(apiService, c.clusterToolMap)
+	if err := reconciler.Reconcile(serviceReconciler); err != nil {
 		utilruntime.HandleError(err)
-		klog.Error(err, fmt.Sprintf("Error when maintain service for AppService[%s]", apiService.Name))
 		return err
 	}
 
@@ -205,62 +198,6 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 		return err
 	}
 
-	return nil
-}
-
-func (c *ApiServiceController) maintainDeployment(target *apis.AppService) error {
-	for clusterId, tool := range c.clusterToolMap {
-		deploymentName := c.getDeploymentName(target)
-		current, err := tool.GetDeployment(target.Namespace, deploymentName)
-		replicas := c.replicaTool.GetReplicas(clusterId, target.Spec.TotalReplicas, target.Spec.ReplicaPolicy)
-		targetDeployment := c.newDeployment(target, &replicas)
-		// Once err occurs during maintaining deployment, the err will be returned and the maintainance will be interrupted
-		if err != nil {
-			// If the deployment does not exist
-			if errors.IsNotFound(err) {
-				err := tool.CreateDeployment(targetDeployment)
-				if err != nil {
-					return err
-				}
-				klog.Infof("Create deployment in cluster[%s] for AppService[%s]", clusterId, target.Name)
-			} else {
-				return err
-			}
-			// If current and target is different, update current.
-		} else if c.isDeploymentDifferent(targetDeployment, current) {
-			err := tool.UpdateDeployment(targetDeployment, current)
-			if err != nil {
-				return err
-			}
-			klog.Infof("Update deployment in cluster[%s] for AppService[%s]", clusterId, target.Name)
-		}
-	}
-	return nil
-}
-
-func (c *ApiServiceController) maintainService(target *apis.AppService) error {
-	for clusterId, tool := range c.clusterToolMap {
-		svcName := c.getServiceName(target)
-		current, err := tool.GetService(target.Namespace, svcName)
-		targetSvc := c.newService(target)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				err := tool.CreateService(targetSvc)
-				if err != nil {
-					return err
-				}
-				klog.Infof("Create service in cluster[%s] for AppService[%s]", clusterId, target.Name)
-			} else {
-				return err
-			}
-		} else if c.isSvcDifferent(targetSvc, current) {
-			err := tool.UpdateService(c.getUpdatedService(targetSvc, current))
-			if err != nil {
-				return err
-			}
-			klog.Infof("Update service in cluster[%s] for AppService[%s]", clusterId, target.Name)
-		}
-	}
 	return nil
 }
 
@@ -383,30 +320,6 @@ func (c *ApiServiceController) newDeployment(appService *apis.AppService, replic
 	return deployment
 }
 
-func (c *ApiServiceController) newService(appService *apis.AppService) *corev1.Service {
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.getServiceName(appService),
-			Namespace: appService.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(appService, apis.SchemeGroupVersion.WithKind(APP_SERVICE_KIND)),
-			},
-		},
-		Spec: appService.Spec.ServiceSpec,
-	}
-	return svc
-}
-
-func (c *ApiServiceController) getUpdatedService(target, current *corev1.Service) *corev1.Service {
-	current.ObjectMeta.Annotations = target.ObjectMeta.GetAnnotations()
-	current.ObjectMeta.Labels = target.ObjectMeta.GetLabels()
-	current.Spec.Type = target.Spec.Type
-	current.Spec.Ports = target.Spec.Ports
-	current.Spec.LoadBalancerIP = target.Spec.LoadBalancerIP
-	current.Spec.Selector = target.Spec.Selector
-	return current
-}
-
 func (c *ApiServiceController) getUpdatedRole(target, current *rbacv1.Role) *rbacv1.Role {
 	current.Rules = target.Rules
 	return current
@@ -421,28 +334,6 @@ func (c *ApiServiceController) isDeploymentDifferent(target, current *appsv1.Dep
 		return true
 	}
 	if !reflect.DeepEqual(target.Spec.Template, current.Spec.Template) {
-		return true
-	}
-	return false
-}
-
-func (c *ApiServiceController) isSvcDifferent(target, current *corev1.Service) bool {
-	if !reflect.DeepEqual(target.ObjectMeta.Annotations, current.ObjectMeta.Annotations) {
-		return true
-	}
-	if !reflect.DeepEqual(target.ObjectMeta.Labels, current.ObjectMeta.Labels) {
-		return true
-	}
-	if len(target.Spec.Type) > 0 && !reflect.DeepEqual(target.Spec.Type, current.Spec.Type) {
-		return true
-	}
-	if len(target.Spec.LoadBalancerIP) > 0 && !reflect.DeepEqual(target.Spec.LoadBalancerIP, current.Spec.LoadBalancerIP) {
-		return true
-	}
-	if len(target.Spec.Ports) > 0 && !reflect.DeepEqual(target.Spec.Ports, current.Spec.Ports) {
-		return true
-	}
-	if len(target.Spec.Selector) > 0 && !reflect.DeepEqual(target.Spec.Selector, current.Spec.Selector) {
 		return true
 	}
 	return false

@@ -16,12 +16,12 @@ var APP_SERVICE_DEPLOYMENT_SUFFIX = "-deployment"
 var APP_SERVICE_DEPLOYMENT_TYPE = "Deployment"
 
 type DeploymentReconciler struct {
-	AppService     apis.AppService
+	AppService     *apis.AppService
 	ClusterToolMap map[string]*components.ClusterTool
 	replicaTool    ReplicaTool
 }
 
-func NewDeploymentReconciler(appService apis.AppService, clusterToolMap map[string]*components.ClusterTool) *DeploymentReconciler {
+func NewDeploymentReconciler(appService *apis.AppService, clusterToolMap map[string]*components.ClusterTool) *DeploymentReconciler {
 	replicaTool := NewReplicaTool(&clusterToolMap)
 	return &DeploymentReconciler{
 		AppService:     appService,
@@ -59,11 +59,14 @@ func (r *DeploymentReconciler) IsResourceNeedUpdate(clusterId string) bool {
 }
 
 func (r *DeploymentReconciler) GetResource(clusterId string) (runtime.Object, error) {
-	return r.ClusterToolMap[clusterId].GetDeployment(r.AppService.Namespace, r.GetResourceName())
+	return r.ClusterToolMap[clusterId].DeploymentLister.Deployments(r.AppService.Namespace).Get(r.GetResourceName())
 }
 
 func (r *DeploymentReconciler) CreateResource(clusterId string) error {
-	return r.ClusterToolMap[clusterId].CreateDeployment(r.NewResourceForCreate(clusterId).(*appsv1.Deployment))
+	kubeClient := r.ClusterToolMap[clusterId].KubeClient
+	deployment := r.NewResourceForCreate(clusterId).(*appsv1.Deployment)
+	_, err := kubeClient.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
+	return err
 }
 
 func (r *DeploymentReconciler) UpdateResource(clusterId string) error {
@@ -83,23 +86,7 @@ func (r *DeploymentReconciler) NewResourceForCreate(clusterId string) runtime.Ob
 			Name:      r.GetResourceName(),
 			Namespace: r.AppService.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(&r.AppService, apis.SchemeGroupVersion.WithKind(APP_SERVICE_KIND)),
-			},
-		},
-		Spec: r.AppService.Spec.DeploymentSpec,
-	}
-	replicas := r.replicaTool.GetReplicas(clusterId, r.AppService.Spec.TotalReplicas, r.AppService.Spec.ReplicaPolicy)
-	deployment.Spec.Replicas = &replicas
-	return deployment
-}
-
-func (r *DeploymentReconciler) newDeployment(clusterId string) *appsv1.Deployment {
-	deployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      r.GetResourceName(),
-			Namespace: r.AppService.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(&r.AppService, apis.SchemeGroupVersion.WithKind(APP_SERVICE_KIND)),
+				*metav1.NewControllerRef(r.AppService, apis.SchemeGroupVersion.WithKind(APP_SERVICE_KIND)),
 			},
 		},
 		Spec: r.AppService.Spec.DeploymentSpec,

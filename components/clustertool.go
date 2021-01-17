@@ -13,8 +13,6 @@ import (
 	asLister "metricsadvisor.ai/appservice/generated/multitenancy/listers/multitenancy/v1"
 
 	istioClient "istio.io/client-go/pkg/clientset/versioned"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apis "metricsadvisor.ai/appservice/apis/multitenancy/v1"
@@ -72,35 +70,6 @@ func (c *ClusterTool) IsApiServiceDifferent(as1, as2 *apis.AppService) bool {
 		return true
 	}
 	return false
-}
-
-func (c *ClusterTool) GetDeployment(namespace, name string) (*appsv1.Deployment, error) {
-	return c.DeploymentLister.Deployments(namespace).Get(name)
-}
-
-func (c *ClusterTool) CreateDeployment(deployment *appsv1.Deployment) error {
-	_, err := c.KubeClient.AppsV1().Deployments(deployment.Namespace).Create(context.TODO(), deployment, metav1.CreateOptions{})
-	return err
-}
-
-func (c *ClusterTool) UpdateDeployment(target, current *appsv1.Deployment) error {
-	current.Spec = *target.Spec.DeepCopy()
-	_, err := c.KubeClient.AppsV1().Deployments(current.Namespace).Update(context.TODO(), current, metav1.UpdateOptions{})
-	return err
-}
-
-func (c *ClusterTool) GetService(namespace, name string) (*corev1.Service, error) {
-	return c.KubeClient.CoreV1().Services(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-}
-
-func (c *ClusterTool) CreateService(svc *corev1.Service) error {
-	_, err := c.KubeClient.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
-	return err
-}
-
-func (c *ClusterTool) UpdateService(target *corev1.Service) error {
-	_, err := c.KubeClient.CoreV1().Services(target.Namespace).Update(context.TODO(), target, metav1.UpdateOptions{})
-	return err
 }
 
 func (c *ClusterTool) GetRole(namespace, name string) (*rbacv1.Role, error) {

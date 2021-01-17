@@ -12,7 +12,6 @@ type Reconciler interface {
 	CreateResource(clusterId string) error
 	IsResourceNeedUpdate(clusterId string) bool
 	UpdateResource(clusterId string) error
-	NewResourceForCreate(clusterId string) runtime.Object
 
 	GetResourceName() string
 	GetResourceType() string
