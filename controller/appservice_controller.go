@@ -192,47 +192,38 @@ func (c *ApiServiceController) processOneEventItem(item EventItem) error {
 		return err
 	}
 
-	if err := c.maintainRole(apiService); err != nil {
-		utilruntime.HandleError(err)
-		klog.Error(err, fmt.Sprintf("Error when maintain role for AppService[%s]", apiService.Name))
-		return err
+	// Maintain Role
+	if c.needToMaintainRole(apiService) {
+		roleReconciler := reconciler.NewRoleReconciler(apiService, c.clusterToolMap)
+		if err := reconciler.Reconcile(roleReconciler); err != nil {
+			utilruntime.HandleError(err)
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (c *ApiServiceController) maintainRole(target *apis.AppService) error {
+func (c *ApiServiceController) needToMaintainRole(target *apis.AppService) bool {
 	// this means there is no Role Definition, return directly
 	if len(target.Spec.RoleTemplate.Kind) == 0 {
-		return nil
+		return false
 	}
-	for clusterId, tool := range c.clusterToolMap {
-		if target.Spec.RoleTemplate.Kind == RESOURCE_KIND_ROLE {
-			targetRole := c.newRole(target)
-			current, err := tool.GetRole(targetRole.Namespace, targetRole.Name)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					err := tool.CreateRole(targetRole)
-					if err != nil {
-						return nil
-					}
-					klog.Infof("Create Role[%s] in cluster[%s] for AppService[%s]", targetRole.Namespace, clusterId, target.Name)
-				} else {
-					return err
-				}
-			} else if c.isRoleDifferent(targetRole, current) {
-				err := tool.UpdateRole(targetRole)
-				if err != nil {
-					return err
-				}
-				klog.Infof("Update Role[%s] in cluster[%s] for AppService[%s]", targetRole.Name, clusterId, target.Name)
-			}
-		} else if target.Spec.RoleTemplate.Kind == RESOURCE_KIND_CLUSTER_ROLE {
-
-		}
+	if target.Spec.RoleTemplate.Kind == RESOURCE_KIND_ROLE {
+		return true
 	}
+	return false
+}
 
-	return nil
+func (c *ApiServiceController) needToMaintainClusterRole(target *apis.AppService) bool {
+	// this means there is no Role Definition, return directly
+	if len(target.Spec.RoleTemplate.Kind) == 0 {
+		return false
+	}
+	if target.Spec.RoleTemplate.Kind == RESOURCE_KIND_CLUSTER_ROLE {
+		return true
+	}
+	return false
 }
 
 func (c *ApiServiceController) verifyRoleSpec(target *apis.AppService) error {
@@ -320,11 +311,6 @@ func (c *ApiServiceController) newDeployment(appService *apis.AppService, replic
 	return deployment
 }
 
-func (c *ApiServiceController) getUpdatedRole(target, current *rbacv1.Role) *rbacv1.Role {
-	current.Rules = target.Rules
-	return current
-}
-
 // TODO: verify whether this comparision is enough or overhead
 func (c *ApiServiceController) isDeploymentDifferent(target, current *appsv1.Deployment) bool {
 	if *target.Spec.Replicas != *current.Spec.Replicas {
@@ -334,13 +320,6 @@ func (c *ApiServiceController) isDeploymentDifferent(target, current *appsv1.Dep
 		return true
 	}
 	if !reflect.DeepEqual(target.Spec.Template, current.Spec.Template) {
-		return true
-	}
-	return false
-}
-
-func (c *ApiServiceController) isRoleDifferent(target, current *rbacv1.Role) bool {
-	if !reflect.DeepEqual(target.Rules, current.Rules) {
 		return true
 	}
 	return false

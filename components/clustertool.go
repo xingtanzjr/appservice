@@ -13,7 +13,6 @@ import (
 	asLister "metricsadvisor.ai/appservice/generated/multitenancy/listers/multitenancy/v1"
 
 	istioClient "istio.io/client-go/pkg/clientset/versioned"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apis "metricsadvisor.ai/appservice/apis/multitenancy/v1"
 )
@@ -70,20 +69,6 @@ func (c *ClusterTool) IsApiServiceDifferent(as1, as2 *apis.AppService) bool {
 		return true
 	}
 	return false
-}
-
-func (c *ClusterTool) GetRole(namespace, name string) (*rbacv1.Role, error) {
-	return c.KubeClient.RbacV1().Roles(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-}
-
-func (c *ClusterTool) CreateRole(target *rbacv1.Role) error {
-	_, err := c.KubeClient.RbacV1().Roles(target.Namespace).Create(context.TODO(), target, metav1.CreateOptions{})
-	return err
-}
-
-func (c *ClusterTool) UpdateRole(target *rbacv1.Role) error {
-	_, err := c.KubeClient.RbacV1().Roles(target.Namespace).Update(context.TODO(), target, metav1.UpdateOptions{})
-	return err
 }
 
 func GetResourceUpdateTime(meta metav1.ObjectMeta) *metav1.Time {
